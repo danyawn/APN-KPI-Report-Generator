@@ -8,26 +8,34 @@
 ' 2) Paste this whole code into the module
 ' 3) Run: Build_APN_KPI_Annual_2026_Template
 '
-' NOTE:
-' - Uses only PowerPoint objects (no Excel dependency).
-' - Uses Office chart engine (ChartData workbook internally).
-' - PATCH: Bullet character hardcoded (PowerPoint compatibility fix)
+' PATCH HISTORY:
+' v1 - Initial release
+' v2 - Fix Chr(8226) bullet error
+' v3 - Fix compile error: remove AddChart2, replace xlLineMarkers/xlColumnClustered
+'      with numeric constants (no Excel library reference needed)
 '===========================================================
 Option Explicit
 
 '========================
 ' DESIGN TOKENS (APN Logo Palette)
 '========================
-Private Const APN_YELLOW As Long = &HF0F8     ' #F8F000 (BGR in VBA)
-Private Const APN_GOLD   As Long = &HC0F8     ' #F8C000
-Private Const APN_BLUE   As Long = &HD86830   ' #3068D8
-Private Const APN_GREEN  As Long = &H408020   ' #208040
-Private Const APN_MAROON As Long = &H2818A0   ' #A01828
+Private Const APN_YELLOW As Long = &HF0F8
+Private Const APN_GOLD   As Long = &HC0F8
+Private Const APN_BLUE   As Long = &HD86830
+Private Const APN_GREEN  As Long = &H408020
+Private Const APN_MAROON As Long = &H2818A0
 Private Const TEXT_BLACK As Long = &H111111
 Private Const GRID_GRAY  As Long = &HD9D9D9
 
 '========================
-' SLIDE SIZE (16:9 Wide Layout)
+' CHART TYPE CONSTANTS (replaces xl* Excel constants)
+' Numeric values from Excel ChartType enum - no Excel reference needed
+'========================
+Private Const CHART_LINE_MARKERS  As Long = 65   ' xlLineMarkers
+Private Const CHART_COLUMN        As Long = 51   ' xlColumnClustered
+
+'========================
+' SLIDE SIZE
 '========================
 Private Const SLIDE_W As Single = 960
 Private Const SLIDE_H As Single = 540
@@ -96,14 +104,11 @@ Private Sub CreateSlide_02_Dashboard(ByVal pres As Presentation)
     Dim sld As Slide
     Set sld = AddBlankSlide(pres)
     AddSlideHeader sld, "RINGKASAN 39 KPI (DASHBOARD TOTAL)"
-
     Dim headers As Variant, rows As Variant
     headers = Array("Total KPI", "Achieved", "Not Achieved", "% Achievement")
     rows = Array(Array("39", "(diisi)", "(diisi)", "(diisi)"))
     AddAuditTable sld, M_LEFT, M_TOP + TITLE_H + 10, 460, 130, headers, rows, APN_BLUE
-
     AddChartPlaceholder_Pie sld, M_LEFT + 500, M_TOP + TITLE_H + 10, 420, 260, "Komposisi Status KPI (Placeholder)"
-
     AddBulletBox sld, M_LEFT, M_TOP + TITLE_H + 160, 460, 170, _
         "HIGHLIGHT UTAMA (diisi setelah data final):", _
         Array("Area risiko tertinggi: (diisi)", "KPI merah dominan: (diisi)", "Catatan khusus Direksi: (diisi)")
@@ -219,7 +224,7 @@ Private Sub CreateSlide_09_Training_LineChart(ByVal pres As Presentation)
     months = Array("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
     values = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     AddLineChart sld, M_LEFT, M_TOP + TITLE_H + 10, SLIDE_W - M_LEFT - M_RIGHT, 340, _
-                 "Jam Training per Karyawan (Placeholder)", months, values, APN_BLUE
+                 "Jam Training per Karyawan (Placeholder)", months, values
     AddBulletBox sld, M_LEFT, M_TOP + TITLE_H + 365, SLIDE_W - M_LEFT - M_RIGHT, 120, _
         "Catatan:", _
         Array("Grafik diisi otomatis dari Excel (Jan-Des).", "Insight ditulis setelah data final tersedia.")
@@ -467,7 +472,6 @@ Private Sub AddChartPlaceholder_Pie(ByVal sld As Slide, _
     End With
 End Sub
 
-' *** PATCH: Bullet character hardcoded untuk kompatibilitas ***
 Private Sub AddBulletBox(ByVal sld As Slide, _
                          ByVal x As Single, ByVal y As Single, _
                          ByVal w As Single, ByVal h As Single, _
@@ -478,14 +482,11 @@ Private Sub AddBulletBox(ByVal sld As Slide, _
     shp.Fill.Solid
     shp.Line.ForeColor.RGB = GRID_GRAY
     shp.Line.Weight = 1
-    
     Dim txt As String, i As Long
     txt = title & vbCrLf
     For i = LBound(bullets) To UBound(bullets)
-        ' PATCH: Ganti Chr(8226) dengan karakter bullet Unicode langsung
         txt = txt & "• " & CStr(bullets(i)) & vbCrLf
     Next i
-    
     With shp.TextFrame2
         .MarginLeft = 14
         .MarginRight = 12
@@ -514,14 +515,11 @@ Private Sub AddAuditTable(ByVal sld As Slide, _
     Dim nCols As Long, nRows As Long
     nCols = UBound(headers) - LBound(headers) + 1
     nRows = UBound(rows) - LBound(rows) + 1
-
     Dim shp As Shape
     Set shp = sld.Shapes.AddTable(nRows + 1, nCols, x, y, w, h)
     Dim tbl As Table
     Set tbl = shp.Table
-
     StyleTableBorders tbl, GRID_GRAY, 0.75
-
     Dim c As Long
     For c = 1 To nCols
         SetCellText tbl.Cell(1, c), CStr(headers(LBound(headers) + c - 1)), 13, True, vbWhite
@@ -529,7 +527,6 @@ Private Sub AddAuditTable(ByVal sld As Slide, _
         tbl.Cell(1, c).Shape.Fill.Solid
         tbl.Cell(1, c).Shape.TextFrame2.TextRange.ParagraphFormat.Alignment = msoAlignCenter
     Next c
-
     Dim r As Long
     For r = 1 To nRows
         For c = 1 To nCols
@@ -542,7 +539,6 @@ Private Sub AddAuditTable(ByVal sld As Slide, _
             tbl.Cell(r + 1, c).Shape.TextFrame2.MarginBottom = 4
             tbl.Cell(r + 1, c).Shape.TextFrame2.VerticalAnchor = msoAnchorMiddle
         Next c
-
         If (r Mod 2 = 0) Then
             For c = 1 To nCols
                 tbl.Cell(r + 1, c).Shape.Fill.ForeColor.RGB = RGB(248, 248, 248)
@@ -550,7 +546,6 @@ Private Sub AddAuditTable(ByVal sld As Slide, _
             Next c
         End If
     Next r
-
     AutoAlignAuditColumns tbl, headers
 End Sub
 
@@ -603,7 +598,6 @@ Private Sub AutoAlignAuditColumns(ByVal tbl As Table, ByVal headers As Variant)
         If InStr(colName, "no") > 0 Then align = msoAlignCenter
         If InStr(colName, "target") > 0 Or InStr(colName, "actual") > 0 Or InStr(colName, "%") > 0 Then align = msoAlignRight
         If InStr(colName, "status") > 0 Then align = msoAlignCenter
-
         Dim r As Long
         For r = 1 To tbl.Rows.Count
             tbl.Cell(r, c).Shape.TextFrame2.TextRange.ParagraphFormat.Alignment = align
@@ -669,50 +663,39 @@ Private Sub AddSimpleTree(ByVal sld As Slide, _
                           ByVal rootText As String, ByVal branches As Variant)
     Dim rootW As Single, rootH As Single
     rootW = 320: rootH = 52
-
     Dim rootX As Single, rootY As Single
     rootX = x + (w - rootW) / 2
     rootY = y
-
     Dim rootShp As Shape
     Set rootShp = sld.Shapes.AddShape(msoShapeRoundedRectangle, rootX, rootY, rootW, rootH)
     StyleTreeNode rootShp, rootText, APN_BLUE
-
     Dim n As Long
     n = UBound(branches) - LBound(branches) + 1
-
     Dim rowY As Single
     rowY = y + 120
-
     Dim nodeW As Single, nodeH As Single, gap As Single
     nodeW = 160: nodeH = 46
     gap = (w - (n * nodeW)) / (n + 1)
     If gap < 8 Then gap = 8
-
     Dim i As Long
     Dim nodeX As Single
     nodeX = x + gap
-
     Dim nodes() As Shape
     ReDim nodes(1 To n)
-
     For i = 1 To n
         Set nodes(i) = sld.Shapes.AddShape(msoShapeRoundedRectangle, nodeX, rowY, nodeW, nodeH)
         StyleTreeNode nodes(i), CStr(branches(LBound(branches) + i - 1)), APN_GOLD
         nodeX = nodeX + nodeW + gap
     Next i
-
     Dim midRootX As Single, midRootY As Single
     midRootX = rootX + rootW / 2
     midRootY = rootY + rootH
-
     For i = 1 To n
         Dim midNodeX As Single, midNodeY As Single
         midNodeX = nodes(i).Left + nodes(i).Width / 2
         midNodeY = nodes(i).Top
         AddConnectorLine sld, midRootX, midRootY, midNodeX, midNodeY, GRID_GRAY
     Next i
-
     Dim noteY As Single
     noteY = rowY + 70
     AddBox sld, x, noteY, w, h - (noteY - y), _
@@ -753,26 +736,27 @@ End Sub
 
 '========================
 ' HELPERS: CHARTS
+' PATCH v3: Removed AddChart2 (PPT 2016+ only).
+'           Replaced xlLineMarkers/xlColumnClustered with numeric constants.
+'           No Excel library reference needed.
 '========================
 
 Private Sub AddLineChart(ByVal sld As Slide, _
                          ByVal x As Single, ByVal y As Single, _
                          ByVal w As Single, ByVal h As Single, _
                          ByVal title As String, ByVal categories As Variant, _
-                         ByVal values As Variant, ByVal accentColor As Long)
+                         ByVal values As Variant)
     Dim shp As Shape
-    On Error GoTo FallbackLine
-    Set shp = sld.Shapes.AddChart2(Style:=240, Type:=xlLineMarkers, Left:=x, Top:=y, Width:=w, Height:=h)
-    GoTo DoneSetLineData
-FallbackLine:
+    On Error Resume Next
+    Set shp = sld.Shapes.AddChart(CHART_LINE_MARKERS, x, y, w, h)
     On Error GoTo 0
-    Set shp = sld.Shapes.AddChart(Type:=xlLineMarkers, Left:=x, Top:=y, Width:=w, Height:=h)
-DoneSetLineData:
-    On Error GoTo 0
+    If shp Is Nothing Then Exit Sub
     With shp.Chart
         .HasTitle = True
         .ChartTitle.Text = title
+        On Error Resume Next
         .ChartArea.Format.Fill.Visible = msoFalse
+        On Error GoTo 0
         SetChartData_OneSeries .ChartData, "Jam Training", categories, values
     End With
 End Sub
@@ -783,18 +767,16 @@ Private Sub AddTwoSeriesLineChart(ByVal sld As Slide, _
                                   ByVal title As String, ByVal categories As Variant, _
                                   ByVal series1 As Variant, ByVal series2 As Variant)
     Dim shp As Shape
-    On Error GoTo FallbackTwo
-    Set shp = sld.Shapes.AddChart2(Style:=240, Type:=xlLineMarkers, Left:=x, Top:=y, Width:=w, Height:=h)
-    GoTo DoneSetTwoData
-FallbackTwo:
+    On Error Resume Next
+    Set shp = sld.Shapes.AddChart(CHART_LINE_MARKERS, x, y, w, h)
     On Error GoTo 0
-    Set shp = sld.Shapes.AddChart(Type:=xlLineMarkers, Left:=x, Top:=y, Width:=w, Height:=h)
-DoneSetTwoData:
-    On Error GoTo 0
+    If shp Is Nothing Then Exit Sub
     With shp.Chart
         .HasTitle = True
         .ChartTitle.Text = title
+        On Error Resume Next
         .ChartArea.Format.Fill.Visible = msoFalse
+        On Error GoTo 0
         SetChartData_TwoSeries .ChartData, categories, "Actual", series1, "Target", series2
     End With
 End Sub
@@ -805,21 +787,18 @@ Private Sub AddComboChart_BarLine(ByVal sld As Slide, _
                                   ByVal title As String, ByVal categories As Variant, _
                                   ByVal barSeries As Variant, ByVal lineSeries As Variant)
     Dim shp As Shape
-    On Error GoTo FallbackCombo
-    Set shp = sld.Shapes.AddChart2(Style:=240, Type:=xlColumnClustered, Left:=x, Top:=y, Width:=w, Height:=h)
-    GoTo DoneSetComboData
-FallbackCombo:
+    On Error Resume Next
+    Set shp = sld.Shapes.AddChart(CHART_COLUMN, x, y, w, h)
     On Error GoTo 0
-    Set shp = sld.Shapes.AddChart(Type:=xlColumnClustered, Left:=x, Top:=y, Width:=w, Height:=h)
-DoneSetComboData:
-    On Error GoTo 0
+    If shp Is Nothing Then Exit Sub
     With shp.Chart
         .HasTitle = True
         .ChartTitle.Text = title
+        On Error Resume Next
         .ChartArea.Format.Fill.Visible = msoFalse
         SetChartData_TwoSeries .ChartData, categories, "Total Aduan", barSeries, "Kecepatan Perbaikan", lineSeries
-        On Error Resume Next
-        .SeriesCollection(2).ChartType = xlLineMarkers
+        ' Change series 2 to line type (65 = xlLineMarkers)
+        .SeriesCollection(2).ChartType = CHART_LINE_MARKERS
         On Error GoTo 0
     End With
 End Sub
@@ -830,6 +809,7 @@ End Sub
 
 Private Sub SetChartData_OneSeries(ByVal cd As ChartData, ByVal seriesName As String, _
                                    ByVal categories As Variant, ByVal values As Variant)
+    On Error Resume Next
     cd.Activate
     Dim wb As Object, ws As Object
     Set wb = cd.Workbook
@@ -843,11 +823,13 @@ Private Sub SetChartData_OneSeries(ByVal cd As ChartData, ByVal seriesName As St
         ws.Cells(i + 2, 2).Value = values(i)
     Next i
     wb.Close SaveChanges:=False
+    On Error GoTo 0
 End Sub
 
 Private Sub SetChartData_TwoSeries(ByVal cd As ChartData, ByVal categories As Variant, _
                                    ByVal s1Name As String, ByVal s1Values As Variant, _
                                    ByVal s2Name As String, ByVal s2Values As Variant)
+    On Error Resume Next
     cd.Activate
     Dim wb As Object, ws As Object
     Set wb = cd.Workbook
@@ -863,4 +845,5 @@ Private Sub SetChartData_TwoSeries(ByVal cd As ChartData, ByVal categories As Va
         ws.Cells(i + 2, 3).Value = s2Values(i)
     Next i
     wb.Close SaveChanges:=False
+    On Error GoTo 0
 End Sub
